@@ -8,9 +8,10 @@
 
 # About
 
-mspms-shiny is a Shiny app designed to be a basic interface for the
-[mspms R package](https://github.com/baynec2/mspms) to analyze data from
-the [Multiplex Substrate Profiling by Mass Spectrometry (MSP-MS)
+[mspms-shiny](https://gonzalezlab.shinyapps.io/mspms_shiny/) is a Shiny
+app designed to be a basic interface for the [mspms R
+package](https://github.com/baynec2/mspms) to analyze data from the
+[Multiplex Substrate Profiling by Mass Spectrometry (MSP-MS)
 method](https://pubmed.ncbi.nlm.nih.gov/36948708/)
 
 On the side bar, you will also see four tabs: About, File Upload,
