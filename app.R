@@ -13,8 +13,10 @@ ui <- dashboardPage( # skin = "midnight",
       menuItem("About", tabName = "about", icon = icon("magnifying-glass-chart")),
       menuItem("File Upload", tabName = "file_upload", icon = icon("file-upload")),
       menuItem("Output", tabName = "output", icon = icon("database")),
+      menuItem("QC", tabName = "qc", icon = icon("check-square")),
       menuItem("Stats", tabName = "stats", icon = icon("star-of-life")),
-      menuItem("DataViz", tabName = "viz", icon = icon("chart-simple"))
+      menuItem("DataViz", tabName = "viz", icon = icon("chart-simple")),
+      menuItem("Report", tabName = "report", icon = icon("file-lines"))
     )
   ),
   dashboardBody(
@@ -33,53 +35,72 @@ ui <- dashboardPage( # skin = "midnight",
             fileInput("upload1", "Upload design matrix", accept = ".csv"),
             fileInput("upload2", "Upload PEAKS LFQ file", accept = ".csv"),
             fileInput("upload3", "Upload PEAKS ID file", accept = ".csv"),
-            fileInput("upload4", "Upload Proteome Discover", accept = ".xlsx")
+            fileInput("upload4", "Upload Proteome Discover", accept = ".xlsx"),
+            fileInput("upload5", "Upload Peptide Library", accept = ".csv")
           )
         )
+      ),
+      tabItem(
+        tabName = "qc",
+        fluidRow(
+          box(plotOutput("qc_plot_1"),height = 10),
+          box(plotOutput("qc_plot_2"),height = 10)
         ),
-        tabItem(
-          tabName = "output",
-          h1("normalized data"),
-          fluidRow(
-            box(DT::DTOutput("processed_data"), width = 12),
-            downloadButton(
-              "downloadData",
-              label = "Download"
-            )
-          )
-        ),
-        tabItem(
-          tabName = "stats",
-          fluidRow(
-            box(DT::DTOutput("ttest_results"), width = 6),
-            box(DT::DTOutput("anova_results"), width = 6)
-          ),
+        fluidRow(
+          box(plotOutput("qc_plot_3"), width = 12, height = 10)
+        )
+      ),
+      tabItem(
+        tabName = "output",
+        h1("normalized data"),
+        fluidRow(
+          box(DT::DTOutput("processed_data"), width = 12),
           downloadButton(
-            "downloadttest",
-            label = "Download t-test"
-          ),
-          downloadButton(
-            "downloadanova",
-            label = "Download anova"
-          )
-        ),
-        tabItem(
-          tabName = "viz",
-          fluidRow(
-            box(plotOutput("PCA"), width = 6),
-            box(plotly::plotlyOutput("heatmap"), width = 6)
-          ),
-          fluidRow(
-            box(plotOutput("volcano_plot"), width = 6),
-            box(plotOutput("icelogo"), width = 6)
-          ),
-          fluidRow(
-            box(plotOutput("cleavage_count_per_position"), width = 6),
+            "downloadData",
+            label = "Download"
           )
         )
+      ),
+      tabItem(
+        tabName = "stats",
+        fluidRow(
+          box(DT::DTOutput("ttest_results"), width = 6),
+          box(DT::DTOutput("anova_results"), width = 6)
+        ),
+        downloadButton(
+          "downloadttest",
+          label = "Download t-test"
+        ),
+        downloadButton(
+          "downloadanova",
+          label = "Download anova"
+        )
+      ),
+      tabItem(
+        tabName = "viz",
+        fluidRow(
+          box(plotOutput("PCA"), width = 6),
+          box(plotly::plotlyOutput("heatmap"), width = 6)
+        ),
+        fluidRow(
+          box(plotOutput("volcano_plot"), width = 6),
+          box(plotOutput("icelogo"), width = 6)
+        ),
+        fluidRow(
+          box(plotOutput("cleavage_count_per_position"), width = 6),
+        )
+      ),
+      tabItem(
+        tabName = "report",
+        fluidRow(
+        downloadButton(
+          "download_report",
+          label = "Download Report"
+        ))
       )
     )
   )
+)
 
 # Define server logic
 server <- function(input, output) {
@@ -106,11 +127,21 @@ server <- function(input, output) {
       )
     }
   })
+  
+  peptide_library <- reactive(
+    {
+      if(is.null(input$upload5$datapath)){
+        mspms::peptide_library
+      } else{
+        readr::read_csv(input$upload5$datapath)
+      }
+    })
 
   # Processing the data normalization data
   mspms_data <- reactive({
-    mspms::mspms(prepared_data(), design_matrix())
+    mspms::mspms(prepared_data(), design_matrix(),peptide_library())
   })
+  
 
   # Downloading processed data
   output$downloadData <- downloadHandler(
@@ -126,7 +157,43 @@ server <- function(input, output) {
     mspms_data(),
     options = list(scrollX = TRUE)
   )
+  
+  
+  ### QC plots ###
+  
+  qc_check_data = reactive({
+    mspms::qc_check(prepared_data(),
+                    peptide_library(),
+                    design_matrix())
+  })
+  
+  qc_plots = reactive({
+    mspms::plot_qc_check(qc_check_data(),ncol=4)
+  })
 
+  output$qc_plot_1 <- renderPlot({
+      qc_plots()[1]
+  })
+  
+  
+  output$qc_plot_2 <- renderPlot({
+      qc_plots()[2]
+  })
+  
+  
+  nd_peptides = reactive({
+    mspms::find_nd_peptides(prepared_data(),
+                            peptide_library(),
+                            design_matrix())
+  })
+  
+  
+  output$qc_plot_3 <- renderPlot({
+    nd_peptides() %>%
+      mspms::plot_nd_peptides()
+  })
+  
+  
 
   anova <- reactive({
     mspms_data() %>%
@@ -203,6 +270,27 @@ server <- function(input, output) {
       mspms::count_cleavages_per_pos() %>%
       mspms::plot_cleavages_per_pos()
   })
-}
+
+  ### Downloading Report Generated by mspms ###
+  
+  
+  # Downloading processed data
+  output$download_report <- downloadHandler(
+    filename = function() {
+      paste("mspms_report", Sys.Date(), ".html", sep = "")
+    },
+    content = function(file = "report.html") {
+      mspms::generate_report(prepared_data = prepared_data(),
+                             design_matrix = design_matrix(),
+                             peptide_library = peptide_library(),
+                             output_file = "report.html"
+      )
+      file.copy("report.html", file)
+    }
+  )
+  
+  
+  
+  }
 # Run the application
 shinyApp(ui = ui, server = server)

@@ -11,7 +11,7 @@
 
 <meta name="author" content="Charlie Bayne" />
 
-<meta name="date" content="2024-06-04" />
+<meta name="date" content="2024-08-23" />
 
 <title>MSPMS-Shiny</title>
 
@@ -1612,7 +1612,7 @@ display: none;
 
 <h1 class="title toc-ignore">MSPMS-Shiny</h1>
 <h4 class="author">Charlie Bayne</h4>
-<h4 class="date">2024-06-04</h4>
+<h4 class="date">2024-08-23</h4>
 
 </div>
 
@@ -1622,8 +1622,8 @@ display: none;
 <p>This is a Shiny app designed to be a basic interface for the <a href="https://github.com/baynec2/mspms">mspms R package</a> to analyze
 data from the <a href="https://pubmed.ncbi.nlm.nih.gov/36948708/">Multiplex Substrate
 Profiling by Mass Spectrometry (MSP-MS) method</a></p>
-<p>On the side bar, you will also see four tabs: About, File Upload,
-Output, Stats, and DataViz</p>
+<p>On the side bar, you will also see 7 tabs: About, File Upload,
+Output, QC, Stats, DataViz, and Report</p>
 <div id="about-1" class="section level2">
 <h2>About</h2>
 <p>The About tab links to the instructions shown on this page.</p>
@@ -1653,11 +1653,24 @@ be .csv files.</p>
 should be a .xlsx file</p>
 </div>
 </div>
+<div id="peptide-library" class="section level2">
+<h2>Peptide Library</h2>
+<p>This is a .csv file of the peptide library used. This must contain
+columns library_reference_id, library_match_sequence, and
+library_real_sequence. The library_reference_id must match what is used
+in your PEAKS or Proteome Discoverer files by name.</p>
+<p>If one is not provided, the default peptide library will be used
+(mspms::peptide_library)</p>
+</div>
 <div id="output" class="section level2">
 <h2>Output</h2>
 <p>Output contains a rendering of the normalized data, and a button that
 says download. This button will allow you to download the data that has
 been processed as a .csv file.</p>
+</div>
+<div id="qc" class="section level2">
+<h2>QC</h2>
+<p>Here plots of basic QC checks are shown.</p>
 </div>
 <div id="stats" class="section level2">
 <h2>Stats</h2>
@@ -1668,8 +1681,8 @@ appear and the data will be ready for download.</p>
 <p>Both of these data frames can be downloaded by using the download
 results</p>
 </div>
-<div id="dataviz." class="section level2">
-<h2>Dataviz.</h2>
+<div id="dataviz" class="section level2">
+<h2>Dataviz</h2>
 <p>The DataViz tab contains a PCA plot, heatmap of the data, volcano
 plots, icelogo, and the count of cleavages per position of all the data.
 Be patient, these plots take a while to render.</p>
@@ -1682,6 +1695,12 @@ relative to T0 for any condition.</p>
 per position of the peptide library for peptides found to significantly
 different (qvalue &lt;= 0.05) and with a log2fc &gt; 3 relative to T0
 for any condition.</p>
+</div>
+<div id="report" class="section level2">
+<h2>Report</h2>
+<p>The report tab contains a download button that allows the user to
+download a standardized .html report with a simple analysis of the data
+(facilitated by mspms::generate_report()).</p>
 </div>
 </div>
 
