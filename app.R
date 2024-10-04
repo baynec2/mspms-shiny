@@ -4,9 +4,12 @@ library("shinydashboardPlus")
 library("mspms")
 library("shinydashboard")
 library("shinyjs")
-
+library("shinybusy")
 ui <- dashboardPage(
-  dashboardHeader(title = "MSP-MS"),
+  dashboardHeader(title = tags$img(
+    src = "mspms_logo.png", align = "left-center",
+    height = "45", width = "auto"
+  )),
   dashboardSidebar(
     # Defining the sidebar menu
     sidebarMenu(
@@ -26,11 +29,26 @@ ui <- dashboardPage(
       menuItem("QC", tabName = "qc", icon = icon("check-square")),
       menuItem("Stats", tabName = "stats", icon = icon("star-of-life")),
       menuItem("DataViz", tabName = "viz", icon = icon("chart-simple")),
-      menuItem("Report", tabName = "report", icon = icon("file-lines"))
+      menuItem("Report", tabName = "report", icon = icon("file-lines")),
+      numericInput(inputId = "log2fc_thresh", "Log2 Fold Change Threshold", 3),
+      numericInput(
+        inputId = "padj_thresh", "Adjusted P value Threshold",
+        0.05, min = 0, max = 1, step = 0.05
+      ),
+      numericInput(
+        inputId = "il_p_thresh", "iceLogo P value Threshold ", 0.05,
+        min = 0,
+        max = 1,
+        step = 0.05
+      ),
+      numericInput("width", "Plot Download Width (in):", 7),
+      numericInput("height", "Plot Download Height (in):", 5),
+      selectInput("format", "Plot Download format:", choices = c("png", "pdf"))
     )
   ),
   dashboardBody(
     useShinyjs(),
+    add_busy_spinner(spin = "fading-circle"),
     tags$head(
       tags$style(HTML("
         /* Custom CSS to gray out disabled tabs */
@@ -79,13 +97,11 @@ ui <- dashboardPage(
           div(
             class = "instructions",
             p("Follow the instructions below to use the application:"),
-            tags$ol(
-              tags$li("Upload your data in the 'File Upload' tab."),
-              tags$li("Once data is uploaded, you will be able to access
+            p("Upload your data in the 'File Upload' tab."),
+            p("Once data is uploaded, you will be able to access
                           tabs to the left where you can look at QC plots,
                           statistics, data visualizations, and even generate a
-                          standardized mspms .html report.")
-            ),
+                          standardized mspms .html report."),
             p("For support, please create an issue at https://github.com/baynec2/mspms-shiny")
           )
         )
@@ -116,9 +132,18 @@ ui <- dashboardPage(
       tabItem(
         tabName = "qc",
         fluidRow(
-          box(plotOutput("qc_plot_1"), width = 6, height = 10),
-          box(plotOutput("qc_plot_2"), width = 6, height = 10)
-        )
+          plotOutput("qc_plot_1"),
+          width = 6, height = 10,
+          downloadButton(
+            "download_qc_plot_1",
+            label = "Download QC Plot 1"
+          ),
+          plotOutput("qc_plot_2"), width = 6, height = 10
+        ),
+        downloadButton(
+          "download_qc_plot_2",
+          label = "Download QC Plot 2"
+        ),
       ),
       tabItem(
         tabName = "processed_data",
@@ -142,7 +167,11 @@ ui <- dashboardPage(
               choices = NULL,
               multiple = TRUE
             ),
-            plotOutput("time_course_plot")
+            plotOutput("time_course_plot"),
+            downloadButton(
+              "download_time_course_plot",
+              label = "Download Plot"
+            ),
           )
         ),
         fluidRow(
@@ -159,14 +188,11 @@ ui <- dashboardPage(
             "plot_type",
             label = "Select Type of Plot to Display",
             choices = c(
-              "PCA", "Volcano Plot", "iceLogo",
-              "Cleavage Count", "Heatmap"
+              "PCA", "Heatmap", "Volcano Plot", "iceLogo",
+              "Cleavage Count"
             ),
             multiple = FALSE
           ),
-          numericInput("width", "Width (inches):", 7),
-          numericInput("height", "Height (inches):", 5),
-          selectInput("format", "Download format:", choices = c("png", "pdf")),
           downloadButton("downloadPlot", "Download Plot")
         ),
         fluidRow(
@@ -192,14 +218,23 @@ server <- function(input, output) {
   output$about <- renderUI({
     includeHTML("./about2.html")
   })
+  
+  ##############################################################################
+  # Setting nice ggplot2 defaults
+  ##############################################################################
+  ggplot2::theme_set(
+    ggplot2::theme_bw()
+  )
 
+  ##############################################################################
+  # Hiding menu items initally, then have them appear once data is loaded
+  ##############################################################################
   ## Initially Hide Tabs ##
   shinyjs::runjs("$('.sidebar-menu a[data-value=\"qc\"]').addClass('disabled-tab');")
   shinyjs::runjs("$('.sidebar-menu a[data-value=\"processed_data\"]').addClass('disabled-tab');")
   shinyjs::runjs("$('.sidebar-menu a[data-value=\"stats\"]').addClass('disabled-tab');")
   shinyjs::runjs("$('.sidebar-menu a[data-value=\"viz\"]').addClass('disabled-tab');")
   shinyjs::runjs("$('.sidebar-menu a[data-value=\"report\"]').addClass('disabled-tab');")
-
   # Enable tabs and remove the grayed-out class when both files are uploaded
   observe({
     # Check if at least one of the three conditions is true
@@ -214,7 +249,9 @@ server <- function(input, output) {
     }
   })
 
-
+  ##############################################################################
+  # Loading the Peptide Library and making nmer calculations based on user input
+  ##############################################################################
   peptide_library <- reactive({
     if (is.null(input$peptide_library$datapath)) {
       mspms::peptide_library
@@ -223,9 +260,19 @@ server <- function(input, output) {
     }
   })
 
-  # observeEvent(input$colData, {
-  #   showTab(inputId = "processed_data")
-  # })
+  all_possible_nmers <- reactive({
+    req(input$nresidues)
+    req(peptide_library())
+    mspms::calculate_all_cleavages(
+      peptide_library_seqs =
+        peptide_library()$library_real_sequence,
+      n_AA_after_cleavage = input$nresidues
+    )
+  })
+  
+  ##############################################################################
+  # pre-processing the data 
+  ##############################################################################
   # Reading in files for the type of data the user is uploading
   prepared_data <- reactive({
     if (!is.null(input$fragpipe$datapath)) {
@@ -251,8 +298,9 @@ server <- function(input, output) {
       )
     }
   })
-
-
+  ##############################################################################
+  # Processing  the data 
+  ##############################################################################
   # Processing the data normalization data
   processed_qf <- reactive({
     req(prepared_data())
@@ -281,10 +329,14 @@ server <- function(input, output) {
     options = list(scrollX = TRUE)
   )
 
-
+  ##############################################################################
+  # QC Plots
+  ##############################################################################
+  
   ### QC plots ###
   output$qc_plot_1 <- renderPlot({
-    mspms::plot_qc_check(processed_qf())
+    mspms::plot_qc_check(processed_qf()) +
+      ggplot2::theme(legend.position = "bottom")
   })
 
 
@@ -292,6 +344,42 @@ server <- function(input, output) {
     req(processed_qf())
     mspms::plot_nd_peptides(processed_qf())
   })
+
+  # Download of QC Plot 1``
+  output$download_qc_plot_1 <- downloadHandler(
+    filename = function() {
+      paste("qc_plot1_", Sys.Date(), ".", input$format, sep = "")
+    },
+    content = function(file) {
+      p <- mspms::plot_qc_check(processed_qf()) +
+        ggplot2::theme(legend.position = "bottom")
+      ggplot2::ggsave(file, p,
+        device = input$format,
+        width = input$width,
+        height = input$height
+      )
+    }
+  )
+
+  # Download of QC Plot 2
+  output$download_qc_plot_2 <- downloadHandler(
+    filename = function() {
+      paste("qc_plot2_", Sys.Date(), ".", input$format, sep = "")
+    },
+    content = function(file) {
+      p <- mspms::plot_nd_peptides(processed_qf()) +
+        ggplot2::theme(legend.position = "bottom")
+      ggplot2::ggsave(file, p,
+        device = input$format,
+        width = input$width,
+        height = input$height
+      )
+    }
+  )
+
+  ##############################################################################
+  # Statistics 
+  ##############################################################################
 
   # Doing the t-tests
   log2fc_t_test_data <- reactive({
@@ -303,14 +391,24 @@ server <- function(input, output) {
   # Determining sig peptides
   sig <- reactive({
     req(log2fc_t_test_data())
-    log2fc_t_test_data() %>%
-      dplyr::filter(
-        p.adj <= 0.05,
-        log2fc >= 3
-      )
+    req(input$log2fc_thresh)
+    req(input$padj_thresh)
+    if (input$log2fc_thresh >= 0) {
+      log2fc_t_test_data() %>%
+        dplyr::filter(
+          p.adj <= input$padj_thresh,
+          log2fc >= input$log2fc_thresh
+        )
+    } else {
+      log2fc_t_test_data() %>%
+        dplyr::filter(
+          p.adj <= input$padj_thresh,
+          log2fc < input$log2fc_thresh
+        )
+    }
   })
 
-  # Downloading processed data
+  # Downloading statistics data
   output$downloadData <- downloadHandler(
     filename = function() {
       paste("ttest_results", Sys.Date(), ".csv", sep = "")
@@ -324,14 +422,18 @@ server <- function(input, output) {
     log2fc_t_test_data(),
     options = list(scrollX = TRUE)
   )
-
+  
+  ##############################################################################
+  # Time course plotting
+  ##############################################################################
+  # Determining what the names of all the peptides in data are. 
   peptide_names <- reactive({
     req(mspms_tidy_data())
     mspms_tidy_data() %>%
       dplyr::pull(peptide) %>%
       unique()
   })
-
+  # Update input to allow user to select peptides in the data 
   observeEvent(
     peptide_names(),
     {
@@ -341,9 +443,15 @@ server <- function(input, output) {
       )
     }
   )
-
+  
+  # Filtering the data based on user input 
+  filtered_data <- reactive({
+    mspms_tidy_data() %>%
+      dplyr::filter(peptide %in% input$peptide_selector)
+  })
+  
+  # Making the plot
   output$time_course_plot <- renderPlot({
-    req(input$peptide_selector)
     filtered_data <- mspms_tidy_data() %>%
       dplyr::filter(peptide %in% input$peptide_selector)
     if (nrow(filtered_data) > 0) { # Check if there's data to plot
@@ -360,22 +468,35 @@ server <- function(input, output) {
     }
   })
 
+  # Download of time course plot
+  output$download_time_course_plot <- downloadHandler(
+    filename = function() {
+      paste("time_course_plot_", Sys.Date(), ".", input$format, sep = "")
+    },
+    content = function(file) {
+      p <- filtered_data() %>%
+        mspms::plot_time_course() +
+        ggplot2::facet_wrap(~peptide)
 
-  ## Data Viz Plots ###
-  # Data Viz Plots ###
+      ggplot2::ggsave(file, p,
+        device = input$format,
+        width = input$width,
+        height = input$height
+      )
+    }
+  )
+
+  ##############################################################################
+  # Data Visualization Plot
+  ##############################################################################
   output$dynamic_plot_output <- renderUI({
     # Conditionally display either a plotly plot or a base R plot
     if (input$plot_type == "Heatmap") {
       plotly::plotlyOutput("plotly_plot_output") # For plotly objects
     } else {
-      plotOutput("plot_output") # For base R plots
+      plotOutput("plot_output", height = "700px") # For base R plots
     }
   })
-
-  # Setting nice ggplot2 defaults
-  ggplot2::theme_set(
-    ggplot2::theme_minimal()
-  )
 
   # Render base R plots (PCA, Volcano Plot, iceLogo, Cleavage Count)
   output$plot_output <- renderPlot({
@@ -385,21 +506,31 @@ server <- function(input, output) {
       mspms_tidy_data() %>%
         mspms::plot_pca()
     } else if (plot_type == "Volcano Plot") {
-      req(log2fc_t_test_data()) # Ensure data is available
+      req(input$log2fc_thresh)
+      req(input$padj_thresh)
+      req(log2fc_t_test_data())
       log2fc_t_test_data() %>%
-        mspms::plot_volcano()
+        mspms::plot_volcano(
+          log2fc_threshold = input$log2fc_thresh,
+          padj_threshold = input$padj_thresh
+        )
     } else if (plot_type == "iceLogo") {
       req(sig()) # Ensure data is available
-      mspms::plot_all_icelogos(sig_cleavage_data = sig())
+      req(input$il_p_thresh)
+      mspms::plot_all_icelogos(
+        sig_cleavage_data = sig(),
+        pval = input$il_p_thresh,
+        background_universe = all_possible_nmers()
+      )
     } else if (plot_type == "Cleavage Count") {
       req(sig()) # Ensure data is available
       mspms::plot_cleavages_per_pos(sig_cleavage_data = sig())
     }
   })
-  
+
   output$plotly_plot_output <- plotly::renderPlotly({
     req(mspms_tidy_data())
-    mspms_tidy_data() %>% 
+    mspms_tidy_data() %>%
       plot_heatmap()
   })
 
@@ -410,14 +541,29 @@ server <- function(input, output) {
     content = function(file) {
       plot_type <- input$plot_type
       if (plot_type == "PCA") {
+        req(mspms_tidy_data())
         p <- mspms_tidy_data() %>%
           mspms::plot_pca()
       } else if (plot_type == "Volcano Plot") {
+        req(input$log2fc_thresh)
+        req(input$padj_thresh)
+        req(log2fc_t_test_data())
         p <- log2fc_t_test_data() %>%
-          mspms::plot_volcano()
+          mspms::plot_volcano(
+            log2fc_threshold = input$log2fc_thresh,
+            padj_threshold = input$padj_thresh
+          )
       } else if (plot_type == "iceLogo") {
-        p <- mspms::plot_all_icelogos(sig_cleavage_data = sig())
+        req(all_possible_nmers())
+        req(input$il_p_thresh)
+        req(sig())
+        p <- mspms::plot_all_icelogos(
+          sig_cleavage_data = sig(),
+          background_universe = all_possible_nmers(),
+          pval = input$il_p_thresh
+        )
       } else if (plot_type == "Cleavage Count") {
+        req(sig())
         p <- mspms::plot_cleavages_per_pos(sig_cleavage_data = sig())
       }
 
@@ -429,7 +575,9 @@ server <- function(input, output) {
     }
   )
 
-  ### Downloading Report Generated by mspms ###
+  ##############################################################################
+  # Generating a standard MSPMS .html report. 
+  ##############################################################################
 
   # Downloading processed data
   output$download_report <- downloadHandler(
@@ -440,6 +588,7 @@ server <- function(input, output) {
       mspms::generate_report(
         prepared_data = prepared_data(),
         peptide_library = peptide_library(),
+        n_residues = input$nresidues,
         output_file = "report.html"
       )
       file.copy("report.html", file)
