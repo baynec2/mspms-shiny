@@ -111,15 +111,15 @@ ui <- dashboardPage(
         fluidRow(
           box(
             title = "Upload files",
+            fileInput("peptide_library", "Upload Peptide Library (uses standard 
+                      228 library if none selected)",
+                      accept = ".csv"),
             # Putting the place to load the files
             fileInput("colData", "Upload colData", accept = ".csv"),
             fileInput("peaks", "Upload PEAKS file", accept = ".csv"),
             fileInput("fragpipe", "Upload Fragpipe file", accept = "tsv"),
             fileInput("proteome_discoverer", "Upload Proteome Discoverer file",
               accept = "tsv"
-            ),
-            fileInput("peptide_library", "Upload Peptide Library",
-              accept = ".csv"
             ),
             sliderInput("nresidues", "N residues to show after cleavage",
               value = 4,
@@ -256,7 +256,7 @@ server <- function(input, output) {
     if (is.null(input$peptide_library$datapath)) {
       mspms::peptide_library
     } else {
-      readr::read_csv(input$peptide_library$datapath)
+      readr::read_csv(input$peptide_library$datapath,col_select = 1:3)
     }
   })
 
