@@ -167,6 +167,12 @@ ui <- dashboardPage(
               choices = NULL,
               multiple = TRUE
             ),
+            selectInput(
+              "data_type",
+              label = "Select data type to plot",
+              choices = c(
+                "normalized and imputed", "raw data"
+              )),
             plotOutput("time_course_plot"),
             downloadButton(
               "download_time_course_plot",
@@ -444,19 +450,32 @@ server <- function(input, output) {
     }
   )
   
+  data_type <- reactive({
+    req(input$data_type)
+    if(input$data_type == "normalized and imputed"){
+      "peptides_norm"
+    }else{
+      "peptides"
+    }
+  })
+  
   # Filtering the data based on user input 
   filtered_data <- reactive({
-    mspms_tidy_data() %>%
+    out <-  mspms_tidy(processed_qf(),se_name = data_type()) %>%
       dplyr::filter(peptide %in% input$peptide_selector)
+    if(data_type() == "peptides") {
+      out <- out %>% 
+        dplyr::rename(peptides_norm = peptides)
+    }
+    out
   })
   
   # Making the plot
   output$time_course_plot <- renderPlot({
-    filtered_data <- mspms_tidy_data() %>%
-      dplyr::filter(peptide %in% input$peptide_selector)
-    if (nrow(filtered_data) > 0) { # Check if there's data to plot
-      p1 <- mspms::plot_time_course(filtered_data) +
-        ggplot2::facet_wrap(~peptide)
+    if (nrow(filtered_data()) > 0) { # Check if there's data to plot
+      p1 <- mspms::plot_time_course(filtered_data()) +
+        ggplot2::facet_wrap(~peptide)+
+        ylab(data_type())
       p1
     } else {
       ggplot2::ggplot() +
