@@ -125,7 +125,8 @@ ui <- dashboardPage(
               value = 4,
               min = 1,
               max = 14
-            )
+            ),
+            actionButton("example_data", "Use built in example data")
           )
         )
       ),
@@ -231,9 +232,12 @@ server <- function(input, output) {
   ggplot2::theme_set(
     ggplot2::theme_bw()
   )
-
   ##############################################################################
-  # Hiding menu items initally, then have them appear once data is loaded
+  # Making reproducible (imputation relies on random numbers)
+  ##############################################################################
+  set.seed(2)
+  ##############################################################################
+  # Hiding menu items initially, then have them appear once data is loaded
   ##############################################################################
   ## Initially Hide Tabs ##
   shinyjs::runjs("$('.sidebar-menu a[data-value=\"qc\"]').addClass('disabled-tab');")
@@ -275,6 +279,26 @@ server <- function(input, output) {
       n_AA_after_cleavage = input$nresidues
     )
   })
+  ##############################################################################
+  # Example Data
+  ##############################################################################
+  # Reactive value to track which dataset to load
+  use_example_data <- reactiveVal(FALSE)
+  
+   observeEvent(input$example_data, {
+    # Use a loop to enable all relevant tabs by removing 'disabled-tab' class
+    tabs_to_enable <- c("qc", "processed_data", "stats", "viz", "report")
+    for (tab in tabs_to_enable) {
+      shinyjs::runjs(paste0("$('.sidebar-menu a[data-value=\"", tab, "\"]').removeClass('disabled-tab');"))
+    }
+    use_example_data(TRUE)
+  }
+    )
+
+  # Observe the example data button
+  observeEvent(input$example_data, {
+    use_example_data(TRUE)  # Set to TRUE when example data button is clicked
+  })
   
   ##############################################################################
   # pre-processing the data 
@@ -302,8 +326,26 @@ server <- function(input, output) {
         n_residues = input$nresidues,
         peptide_library = peptide_library()
       )
-    }
-  })
+    } else if (use_example_data()){
+        
+        lfq_filepath <- system.file("extdata/peaks_protein-peptides-lfq.csv",
+                                    package = "mspms"
+        )
+        
+        colData_filepath <- system.file("extdata/colData.csv",
+                                        package = "mspms")
+        
+        # Prepare the data
+        example_data <-mspms::prepare_peaks(lfq_filepath,
+                                            colData_filepath,
+                                            0.3,
+                                            n_residues = input$nresidues)
+        
+      }
+    
+  })  
+  
+  
   ##############################################################################
   # Processing  the data 
   ##############################################################################
@@ -475,7 +517,7 @@ server <- function(input, output) {
     if (nrow(filtered_data()) > 0) { # Check if there's data to plot
       p1 <- mspms::plot_time_course(filtered_data()) +
         ggplot2::facet_wrap(~peptide)+
-        ylab(data_type())
+        ggplot2::ylab(data_type())
       p1
     } else {
       ggplot2::ggplot() +
