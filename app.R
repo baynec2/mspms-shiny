@@ -6,10 +6,7 @@ library("shinydashboard")
 library("shinyjs")
 library("shinybusy")
 ui <- dashboardPage(
-  dashboardHeader(title = tags$img(
-    src = "mspms_logo.png", align = "left-center",
-    height = "45", width = "auto"
-  )),
+  dashboardHeader(title = "mspms"),
   dashboardSidebar(
     # Defining the sidebar menu
     sidebarMenu(
@@ -102,7 +99,11 @@ ui <- dashboardPage(
                           tabs to the left where you can look at QC plots,
                           statistics, data visualizations, and even generate a
                           standardized mspms .html report."),
-            p("For support, please create an issue at https://github.com/baynec2/mspms-shiny")
+            p("For support, please create an issue at:"),
+            tags$a(
+              "https://github.com/baynec2/mspms-shiny",
+              href = "https://github.com/baynec2/mspms-shiny"
+            )
           )
         )
       ),
