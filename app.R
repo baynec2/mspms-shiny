@@ -5,6 +5,7 @@ library("mspms")
 library("shinydashboard")
 library("shinyjs")
 library("shinybusy")
+options(expressions = 500000)
 ui <- dashboardPage(
   dashboardHeader(title = "mspms"),
   dashboardSidebar(
