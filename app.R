@@ -5,6 +5,8 @@ library("mspms")
 library("shinydashboard")
 library("shinyjs")
 library("shinybusy")
+library("imputeLCMD")# Keep getting a weird error
+# Warning: Error in impute_matrix: requireNamespace("imputeLCMD") is not TRUE
 options(expressions = 500000)
 ui <- dashboardPage(
   dashboardHeader(title = "mspms"),

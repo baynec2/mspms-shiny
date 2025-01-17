@@ -5,9 +5,9 @@ account: gonzalezlab
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 11745649
-bundleId: 9663557
+bundleId: 9663625
 url: https://gonzalezlab.shinyapps.io/mspms_shiny/
 version: 1
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: .Rprofile|benchmarking.R|README.md|README.Rmd
+ignoredFiles: .Rprofile|README.md|README.Rmd
