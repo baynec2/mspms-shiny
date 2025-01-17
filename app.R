@@ -165,7 +165,7 @@ ui <- dashboardPage(
         tabName = "stats",
         fluidRow(
           box(
-            DT::DTOutput("ttest_results")
+            DT::DTOutput("ttest_result_table")
           ),
           box(
             selectizeInput("peptide_selector", "Select Peptide(s) to plot",
@@ -187,7 +187,7 @@ ui <- dashboardPage(
         ),
         fluidRow(
           downloadButton(
-            "ttest_results",
+            "ttest_result_download",
             label = "Download t-test results"
           ),
         )
@@ -461,7 +461,7 @@ server <- function(input, output) {
   })
 
   # Downloading statistics data
-  output$ttest_results <- downloadHandler(
+  output$ttest_result_download <- downloadHandler(
     filename = function() {
       paste("ttest_results_", Sys.Date(), ".csv", sep = "")
     },
@@ -470,7 +470,7 @@ server <- function(input, output) {
     }
   )
 
-  output$ttest_results <- DT::renderDT(
+  output$ttest_result_table <- DT::renderDT(
     log2fc_t_test_data(),
     options = list(scrollX = TRUE)
   )
