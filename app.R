@@ -154,7 +154,7 @@ ui <- dashboardPage(
         fluidRow(
           box(DT::DTOutput("processed_data"), width = 12),
           downloadButton(
-            "downloadData",
+            "downloadpd",
             label = "Download"
           )
         )
@@ -185,7 +185,7 @@ ui <- dashboardPage(
         ),
         fluidRow(
           downloadButton(
-            "downloadttest",
+            "ttest_results",
             label = "Download t-test results"
           ),
         )
@@ -365,9 +365,9 @@ server <- function(input, output) {
 
 
   # Downloading processed data
-  output$downloadData <- downloadHandler(
+  output$downloadpd <- downloadHandler(
     filename = function() {
-      paste("mspms_data", Sys.Date(), ".csv", sep = "")
+      paste("mspms_data_", Sys.Date(), ".csv", sep = "")
     },
     content = function(file) {
       readr::write_csv(mspms_tidy_data(), file)
@@ -459,9 +459,9 @@ server <- function(input, output) {
   })
 
   # Downloading statistics data
-  output$downloadData <- downloadHandler(
+  output$ttest_results <- downloadHandler(
     filename = function() {
-      paste("ttest_results", Sys.Date(), ".csv", sep = "")
+      paste("ttest_results_", Sys.Date(), ".csv", sep = "")
     },
     content = function(file) {
       readr::write_csv(log2fc_t_test_data(), file)
@@ -594,7 +594,7 @@ server <- function(input, output) {
   output$plotly_plot_output <- plotly::renderPlotly({
     req(mspms_tidy_data())
     mspms_tidy_data() %>%
-      plot_heatmap()
+      plot_heatmap(show_dendrogram = c(FALSE,FALSE))
   })
 
   output$downloadPlot <- downloadHandler(
