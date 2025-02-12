@@ -164,8 +164,14 @@ ui <- dashboardPage(
       tabItem(
         tabName = "stats",
         fluidRow(
+          selectInput(
+            "statistics_type",
+            label = "Select statistics to perform",
+            choices = c(
+              "limma", "t-tests"
+            )),
           box(
-            DT::DTOutput("ttest_result_table")
+            DT::DTOutput("stats_results")
           ),
           box(
             selectizeInput("peptide_selector", "Select Peptide(s) to plot",
@@ -187,8 +193,8 @@ ui <- dashboardPage(
         ),
         fluidRow(
           downloadButton(
-            "ttest_result_download",
-            label = "Download t-test results"
+            "stats_download",
+            label = "Download statistic results"
           ),
         )
       ),
@@ -433,45 +439,57 @@ server <- function(input, output) {
   # Statistics 
   ##############################################################################
 
-  # Doing the t-tests
-  log2fc_t_test_data <- reactive({
+  # Statistic test depending on the type requested by the user
+  stats_data <- reactive({
     req(processed_qf())
-    processed_qf() %>%
-      mspms::log2fc_t_test()
+    
+    # Check which statistic type the user selected and compute accordingly
+    if (input$statistics_type == "limma") {
+      mspms::limma_stats(processed_qf())
+    } else if (input$statistics_type == "t-tests") {
+      processed_qf() %>%
+        mspms::log2fc_t_test()
+    } else {
+      return(NULL)  # Return NULL if no valid statistics type selected
+    }
   })
-
-  # Determining sig peptides
+  
+  # Determining significant peptides based on log2fc and adjusted p-value thresholds
   sig <- reactive({
-    req(log2fc_t_test_data())
+    req(stats_data())  # Ensure stats data is available
     req(input$log2fc_thresh)
     req(input$padj_thresh)
-    if (input$log2fc_thresh >= 0) {
-      log2fc_t_test_data() %>%
-        dplyr::filter(
-          p.adj <= input$padj_thresh,
-          log2fc >= input$log2fc_thresh
-        )
-    } else {
-      log2fc_t_test_data() %>%
-        dplyr::filter(
-          p.adj <= input$padj_thresh,
-          log2fc < input$log2fc_thresh
-        )
+    
+    # Check if log2fc_thresh is 0 and handle it
+    if (input$log2fc_thresh == 0) {
+      stop("log2fc_thresh cannot be 0. Please provide a non-zero value.")  # Stop execution with a message
     }
+    
+    # Filter data based on thresholds
+    stats_data() %>%
+      dplyr::filter(
+        p.adj <= input$padj_thresh,
+        if (input$log2fc_thresh > 0) {
+          log2fc >= input$log2fc_thresh  # Select peptides with log2fc greater than the threshold
+        } else {
+          log2fc <= input$log2fc_thresh  # Select peptides with log2fc less than the threshold
+        }
+      )
   })
-
+  
   # Downloading statistics data
-  output$ttest_result_download <- downloadHandler(
+  output$stat_download <- downloadHandler(
     filename = function() {
-      paste("ttest_results_", Sys.Date(), ".csv", sep = "")
+      paste(input$statistics_type, "_", Sys.Date(), ".csv", sep = "")
     },
     content = function(file) {
-      readr::write_csv(log2fc_t_test_data(), file)
+      readr::write_csv(stats_data(), file)  # Save the computed stats data to CSV
     }
   )
-
-  output$ttest_result_table <- DT::renderDT(
-    log2fc_t_test_data(),
+  
+  # Render the statistics results in a table
+  output$stats_results <- DT::renderDT(
+    stats_data(),
     options = list(scrollX = TRUE)
   )
   
@@ -573,12 +591,14 @@ server <- function(input, output) {
     } else if (plot_type == "Volcano Plot") {
       req(input$log2fc_thresh)
       req(input$padj_thresh)
-      req(log2fc_t_test_data())
-      log2fc_t_test_data() %>%
+      req(stats_data())
+      stats_data() %>%
         mspms::plot_volcano(
           log2fc_threshold = input$log2fc_thresh,
           padj_threshold = input$padj_thresh
-        )
+        ) +
+        ggplot2::geom_point(ggplot2::aes(color = peptide_type))
+
     } else if (plot_type == "iceLogo") {
       req(sig()) # Ensure data is available
       req(input$il_p_thresh)
@@ -612,12 +632,13 @@ server <- function(input, output) {
       } else if (plot_type == "Volcano Plot") {
         req(input$log2fc_thresh)
         req(input$padj_thresh)
-        req(log2fc_t_test_data())
-        p <- log2fc_t_test_data() %>%
+        req(stats_data())
+        p <- stats_data() %>%
           mspms::plot_volcano(
             log2fc_threshold = input$log2fc_thresh,
             padj_threshold = input$padj_thresh
-          )
+          )+
+          ggplot2::geom_point(ggplot2::aes(color = peptide_type))
       } else if (plot_type == "iceLogo") {
         req(all_possible_nmers())
         req(input$il_p_thresh)
