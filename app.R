@@ -478,7 +478,7 @@ server <- function(input, output) {
   })
   
   # Downloading statistics data
-  output$stat_download <- downloadHandler(
+  output$stats_download <- downloadHandler(
     filename = function() {
       paste(input$statistics_type, "_", Sys.Date(), ".csv", sep = "")
     },
@@ -603,7 +603,7 @@ server <- function(input, output) {
       req(sig()) # Ensure data is available
       req(input$il_p_thresh)
       mspms::plot_all_icelogos(
-        sig_cleavage_data = sig(),
+        sig_cleavage_data = dplyr::filter(sig(),!is.na(cleavage_seq)),
         pval = input$il_p_thresh,
         background_universe = all_possible_nmers()
       )
