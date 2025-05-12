@@ -125,6 +125,8 @@ ui <- dashboardPage(
             fileInput("proteome_discoverer", "Upload Proteome Discoverer file",
               accept = "tsv"
             ),
+            fileInput("diann","Upload DIA-NN file",
+                      accept = "tsv"),
             sliderInput("nresidues", "N residues to show after cleavage",
               value = 4,
               min = 1,
@@ -336,25 +338,26 @@ server <- function(input, output) {
         n_residues = input$nresidues,
         peptide_library = peptide_library()
       )
+    } else if (!is.null(input$diann)){
+      mspms::prepare_diann(input$diann$datapath,
+                           input$colData$datapath,
+                           n_residues = input$nresidues,
+                           peptide_library = peptide_library())
     } else if (use_example_data()){
-        
         lfq_filepath <- system.file("extdata/peaks_protein-peptides-lfq.csv",
                                     package = "mspms"
         )
         
         colData_filepath <- system.file("extdata/colData.csv",
                                         package = "mspms")
-        
+      
         # Prepare the data
         example_data <-mspms::prepare_peaks(lfq_filepath,
                                             colData_filepath,
                                             0.3,
                                             n_residues = input$nresidues)
-        
-      }
-    
+    }
   })  
-  
   
   ##############################################################################
   # Processing  the data 
