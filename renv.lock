@@ -1687,14 +1687,14 @@
     },
     "mspms": {
       "Package": "mspms",
-      "Version": "0.99.7",
+      "Version": "1.1.0",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteUsername": "baynec2",
       "RemoteRepo": "mspms",
       "RemoteRef": "main",
-      "RemoteSha": "4a2ab326e1279b5539f0fbe0455df524a285210f",
+      "RemoteSha": "e5129fa8c14ce9bf0506d12496ba0b888ae29f7c",
       "Requirements": [
         "QFeatures",
         "R",
@@ -1715,7 +1715,7 @@
         "tibble",
         "tidyr"
       ],
-      "Hash": "0110d17717af2c51d576910e0e7930a9"
+      "Hash": "0f4a9bb15ccbf74bc7ced113384208e3"
     },
     "munsell": {
       "Package": "munsell",
@@ -2311,6 +2311,21 @@
         "shiny"
       ],
       "Hash": "7dc8feb4207741ff581422a04fc8f3ea"
+    },
+    "shinycssloaders": {
+      "Package": "shinycssloaders",
+      "Version": "1.1.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "digest",
+        "glue",
+        "grDevices",
+        "htmltools",
+        "shiny"
+      ],
+      "Hash": "2b45a467a30d6a88a1892a738c0900cf"
     },
     "shinydashboard": {
       "Package": "shinydashboard",

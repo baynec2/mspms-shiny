@@ -139,13 +139,17 @@ ui <- dashboardPage(
       tabItem(
         tabName = "qc",
         fluidRow(
-          plotOutput("qc_plot_1"),
-          width = 6, height = 10,
+          shinycssloaders::withSpinner(
+            plotOutput("qc_plot_1"),
+          ),width = 6, height = 10,
           downloadButton(
             "download_qc_plot_1",
             label = "Download QC Plot 1"
           ),
-          plotOutput("qc_plot_2"), width = 6, height = 10
+          shinycssloaders::withSpinner(
+            plotOutput("qc_plot_2")
+          ),
+          width = 6, height = 10
         ),
         downloadButton(
           "download_qc_plot_2",
@@ -156,7 +160,10 @@ ui <- dashboardPage(
         tabName = "processed_data",
         h1("processed data"),
         fluidRow(
-          box(DT::DTOutput("processed_data"), width = 12),
+          box(
+            shinycssloaders::withSpinner(
+              DT::DTOutput("processed_data")
+              ), width = 12),
           downloadButton(
             "downloadpd",
             label = "Download"
@@ -173,20 +180,27 @@ ui <- dashboardPage(
               "limma", "t-tests"
             )),
           box(
-            DT::DTOutput("stats_results")
+            shinycssloaders::withSpinner(
+              DT::DTOutput("stats_results")
+            )
           ),
           box(
-            selectizeInput("peptide_selector", "Select Peptide(s) to plot",
-              choices = NULL,
-              multiple = TRUE
-            ),
             selectInput(
               "data_type",
               label = "Select data type to plot",
               choices = c(
                 "normalized and imputed", "raw data"
-              )),
-            plotOutput("time_course_plot"),
+              )
+              ),
+            selectInput(
+              "axis_type",
+              label = "Select axis type",
+              choices = c("free_y","fixed"),
+              selected = "free_y"
+            ),
+            shinycssloaders::withSpinner(
+            plotOutput("time_course_plot")
+            ),
             downloadButton(
               "download_time_course_plot",
               label = "Download Plot"
@@ -215,7 +229,9 @@ ui <- dashboardPage(
           downloadButton("downloadPlot", "Download Plot")
         ),
         fluidRow(
-          uiOutput(outputId = "dynamic_plot_output")
+          shinycssloaders::withSpinner(
+            uiOutput(outputId = "dynamic_plot_output")
+        )
         )
       ),
       tabItem(
@@ -492,31 +508,14 @@ server <- function(input, output) {
   
   # Render the statistics results in a table
   output$stats_results <- DT::renderDT(
-    stats_data(),
+    stats_data(),#%>% 
+      #dplyr::mutate(across(where(is.numeric), ~ round(.x, 2))),
     options = list(scrollX = TRUE)
   )
   
   ##############################################################################
   # Time course plotting
   ##############################################################################
-  # Determining what the names of all the peptides in data are. 
-  peptide_names <- reactive({
-    req(mspms_tidy_data())
-    mspms_tidy_data() %>%
-      dplyr::pull(peptide) %>%
-      unique()
-  })
-  # Update input to allow user to select peptides in the data 
-  observeEvent(
-    peptide_names(),
-    {
-      updateSelectizeInput(
-        inputId = "peptide_selector",
-        choices = peptide_names()
-      )
-    }
-  )
-  
   data_type <- reactive({
     req(input$data_type)
     if(input$data_type == "normalized and imputed"){
@@ -526,29 +525,42 @@ server <- function(input, output) {
     }
   })
   
-  # Filtering the data based on user input 
+  # Filtering the data based on user-selected peptide(s)
   filtered_data <- reactive({
-    out <-  mspms_tidy(processed_qf(),se_name = data_type()) %>%
-      dplyr::filter(peptide %in% input$peptide_selector)
-    if(data_type() == "peptides") {
+    # Get row indices of selected rows in stats_results
+    selected_rows <- input$stats_results_rows_selected
+    
+    # Return early if nothing is selected
+    if (length(selected_rows) == 0) {
+      return(NULL)
+    }
+    
+    # Get the peptide values from the selected rows
+    selected_peptides <- stats_data()$peptide[selected_rows]
+    
+    out <- mspms_tidy(processed_qf(), se_name = data_type()) %>%
+      dplyr::filter(peptide %in% selected_peptides)
+    
+    if (data_type() == "peptides") {
       out <- out %>% 
         dplyr::rename(peptides_norm = peptides)
     }
+    
     out
   })
-  
   # Making the plot
   output$time_course_plot <- renderPlot({
-    if (nrow(filtered_data()) > 0) { # Check if there's data to plot
+    if(!is.null(filtered_data())) { # Check if there's data to plot
       p1 <- mspms::plot_time_course(filtered_data()) +
-        ggplot2::facet_wrap(~peptide)+
+        ggplot2::facet_wrap(~peptide,scales = input$axis_type)+
         ggplot2::ylab(data_type())
       p1
     } else {
       ggplot2::ggplot() +
         ggplot2::geom_text(ggplot2::aes(
           x = 1, y = 1,
-          label = "No data to display. Please select a peptide."
+          label = "No data to display. Please select a peptide by clicking the
+          rows of interest on the table to the left."
         )) +
         ggplot2::theme_void()
     }
@@ -562,7 +574,7 @@ server <- function(input, output) {
     content = function(file) {
       p <- filtered_data() %>%
         mspms::plot_time_course() +
-        ggplot2::facet_wrap(~peptide)
+        ggplot2::facet_wrap(~peptide,scales = input$axis_type)
 
       ggplot2::ggsave(file, p,
         device = input$format,
