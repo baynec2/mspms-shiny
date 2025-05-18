@@ -588,11 +588,13 @@ server <- function(input, output) {
   # Data Visualization Plot
   ##############################################################################
   output$dynamic_plot_output <- renderUI({
-    # Conditionally display either a plotly plot or a base R plot
     if (input$plot_type == "Heatmap") {
-      plotly::plotlyOutput("plotly_plot_output") # For plotly objects
+      tagList(
+        fluidRow(plotly::plotlyOutput("plotly_plot_output", height = "700px")),
+        fluidRow(plotOutput("clicked_heatmap_plot", height = "400px"))
+      )
     } else {
-      plotOutput("plot_output", height = "700px") # For base R plots
+      plotOutput("plot_output", height = "700px")
     }
   })
 
@@ -627,11 +629,31 @@ server <- function(input, output) {
       mspms::plot_cleavages_per_pos(sig_cleavage_data = sig())
     }
   })
-
-  output$plotly_plot_output <- plotly::renderPlotly({
+  
+  heatmaply_output <- reactive({
     req(mspms_tidy_data())
     mspms_tidy_data() %>%
       plot_heatmap(show_dendrogram = c(FALSE,FALSE))
+    
+  })
+
+  output$plotly_plot_output <- plotly::renderPlotly({
+    heatmaply_output()
+  })
+  
+  
+  # Reactive: get peptide selected by click
+  output$clicked_heatmap_plot <- renderPlot({
+    req(heatmaply_output())
+    column_order = heatmaply_output()$x$layout$xaxis$ticktext
+    click <- plotly::event_data("plotly_click", source = "A")
+    req(click)
+    peptide_clicked <- column_order[click$x]
+    req(peptide_clicked)
+    # Filter the data for the clicked peptide
+    plot_data <- mspms_tidy_data() %>%
+      dplyr::filter(peptide == peptide_clicked)
+    mspms::plot_time_course(plot_data)
   })
 
   output$downloadPlot <- downloadHandler(
