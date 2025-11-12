@@ -125,6 +125,7 @@ ui <- dashboardPage(
             fileInput("proteome_discoverer", "Upload Proteome Discoverer file",
               accept = "tsv"
             ),
+            fileInput("sage","Upload Sage lfq file",accept = "tsv"),
             fileInput("diann","Upload DIA-NN file",
                       accept = "tsv"),
             sliderInput("nresidues", "N residues to show after cleavage",
@@ -359,6 +360,11 @@ server <- function(input, output) {
                            input$colData$datapath,
                            n_residues = input$nresidues,
                            peptide_library = peptide_library())
+    } else if (!is.null(input$sage)){
+      mspms::prepare_sage(input$sage$datapath,
+                          input$colData$datapath,
+                          n_residues = input$nresidues,
+                          peptide_library = peptide_library())
     } else if (use_example_data()){
         lfq_filepath <- system.file("extdata/peaks_protein-peptides-lfq.csv",
                                     package = "mspms"
